@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Audio-Trainer</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: #f0f2f5; 
+            display: flex; 
+            justify-content: center; 
+            padding: 15px; 
+            margin: 0;
+            min-height: 100vh;
+            align-items: flex-start;
+        }
+        .card { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 20px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
+            width: 100%;       
+            max-width: 450px;  
+            text-align: center; 
+            box-sizing: border-box;
+            margin-top: 20px;
+        }
+        h2 { color: #333; margin-top: 0; }
+        p { color: #666; margin-bottom: 5px; }
+        
+        select, button, input[type="range"] { 
+            margin: 15px 0; 
+            width: 100%; 
+            font-size: 18px; 
+        }
+        select, button { 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 1px solid #ddd; 
+            background-color: white;
+            display: block;
+        }
+        button { 
+            background: #4a90e2; 
+            color: white; 
+            cursor: pointer; 
+            border: none; 
+            transition: 0.3s; 
+            font-weight: bold; 
+            touch-action: manipulation;
+        }
+        button:active { background: #357abd; transform: scale(0.98); }
+        .secondary-btn { background: #6c757d; margin-top: 10px; }
+        .hidden { display: none; }
+        
+        .answer-item { 
+            text-align: left; 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            border-left: 6px solid #4a90e2; 
+            border-radius: 8px; 
+            font-size: 16px;
+        }
+        .status { color: #888; margin-top: 15px; font-weight: bold; font-size: 18px; }
+        .speed-label { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
+        input[type=range] { height: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="card" id="setup-screen">
+    <h2>Einstellungen</h2>
+    
+    <p>Anzahl der Aufnahmen:</p>
+    <select id="file-count">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="5">5</option>
+        <option value="8" selected>8</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+    </select>
+
+    <p>Wiedergabegeschwindigkeit:</p>
+    <input type="range" id="speed-range" min="0.5" max="1.5" step="0.1" value="1.0" oninput="updateSpeedLabel(this.value)">
+    <div class="speed-label">
+        <span>0.5x</span>
+        <span id="speed-value"><strong>1.0x</strong></span>
+        <span>1.5x</span>
+    </div>
+
+    <button onclick="initNewTest()" style="margin-top: 25px;">START</button>
+</div>
+
+<div class="card hidden" id="play-screen">
+    <h2 id="play-title">Zuhören...</h2>
+    <div style="font-size: 70px; margin: 30px;">🔊</div>
+    <div class="status" id="status-text">Aufnahme 1</div>
+    <p id="current-speed-display" style="font-size: 14px; color: #aaa;"></p>
+</div>
+
+<div class="card hidden" id="result-screen">
+    <h2>Antworten</h2>
+    <div id="answers-container" style="max-height: 50vh; overflow-y: auto; margin-bottom: 20px;"></div>
+    <button onclick="restartSameTest()">Wiederholen</button>
+    <button class="secondary-btn" onclick="location.reload()">Neuer Test</button>
+</div>
+
+<script>
+const fullLibrary = [
+   { name: "Lukas Weber", phone: "582 483 91 76", file: "ttsmaker-file-2026-5-11-14-12-53.mp3" },
+{ name: "Marie Krüger", phone: "970 395 14 82", file: "ttsmaker-file-2026-5-11-14-15-14.mp3" },
+{ name: "Jan Hoffmann", phone: "363 244 85 91", file: "ttsmaker-file-2026-5-11-14-23-24.mp3" },
+{ name: "Sarah Wagner", phone: "501 928 36 647", file: "ttsmaker-file-2026-5-11-14-27-47.mp3" },
+{ name: "Felix Bauer", phone: "496 510 29 88", file: "ttsmaker-file-2026-5-11-14-30-13.mp3" },
+{ name: "Elena Richter", phone: "810 877 44 31 2", file: "ttsmaker-file-2026-5-11-14-39-54.mp3" },
+{ name: "Paul Zimmermann", phone: "33 206 73 71 49", file: "ttsmaker-file-2026-5-11-14-42-15.mp3" },
+{ name: "Julia Wolf", phone: "47 11 584 66 39", file: "ttsmaker-file-2026-5-11-14-43-50.mp3" },
+{ name: "Marc Schneider", phone: "59 204 44 111 50 7", file: "ttsmaker-file-2026-5-11-14-47-58.mp3" },
+{ name: "Lisa Fischer", phone: "86 720 88 66 91", file: "ttsmaker-file-2026-5-11-14-50-58.mp3" },
+{ name: "Tim Becker", phone: "72 509 20 84 66", file: "ttsmaker-file-2026-5-11-14-53-7.mp3" },
+{ name: "Anna Mayer", phone: "43 111 77 92 84", file: "ttsmaker-file-2026-5-11-14-55-40.mp3" },
+{ name: "Max Klein", phone: "51 830 206 46 7", file: "ttsmaker-file-2026-5-11-14-57-18.mp3" },
+{ name: "Sophie Schwarz", phone: "99 416 63 55 12", file: "ttsmaker-file-2026-5-11-14-58-40.mp3" },
+{ name: "Erik Neumann", phone: "61 207 55 88 14", file: "ttsmaker-file-2026-5-11-15-0-17.mp3" },
+{ name: "Laura Bergmann", phone: "38 209 40 37 33 16", file: "ttsmaker-file-2026-5-11-15-2-19.mp3" },
+{ name: "Jonas Feetler", phone: "69 803 55 204 11", file: "ttsmaker-file-2026-5-11-15-4-19.mp3" },
+{ name: "Clara Otto", phone: "44 550 89 84 31", file: "ttsmaker-file-2026-5-11-15-6-3.mp3" },
+{ name: "Leon Sauer", phone: "75 124 99 66 33", file: "ttsmaker-file-2026-5-11-15-7-34.mp3" },
+{ name: "David Fuchs", phone: "52 307 27 48 94", file: "ttsmaker-file-2026-5-11-15-10-28.mp3" },
+{ name: "Hanna Peters", phone: "91 666 39 40 27", file: "ttsmaker-file-2026-5-11-15-11-21.mp3" },
+  { "name": "Jakob Lang", "phone": "84 46 14 55 28 39", "file": "ttsmaker-file-2026-5-11-15-13-30.mp3" },
+  { "name": "Emma Scholz", "phone": "72 811 74 93 99", "file": "ttsmaker-file-2026-5-11-15-17-32.mp3" },
+  { "name": "Moritz Jung", "phone": "94 77 203 99 84 65", "file": "ttsmaker-file-2026-5-11-15-19-17.mp3" },
+  { "name": "Lara Weiß", "phone": "53 0 550 48 91 2", "file": "ttsmaker-file-2026-5-11-15-21-7.mp3" },
+  { "name": "Lara Weiß", "phone": "53 0 550 48 91 2", "file": "ttsmaker-file-2026-5-11-15-24-49.mp3" },
+  { "name": "Kerstin Kеller", "phone": "79 209 44 71 86 3", "file": "ttsmaker-file-2026-5-11-15-26-39.mp3" },
+  { "name": "Oskar Frank", "phone": "55 66 28 49 27", "file": "ttsmaker-file-2026-5-11-15-28-47.mp3" },
+  { "name": "Lea Hartong", "phone": "83 848 55 31 0", "file": "ttsmaker-file-2026-5-11-15-30-23.mp3" },
+  { "name": "Anton Berg", "phone": "47 144 79 27 85", "file": "ttsmaker-file-2026-5-11-15-31-44.mp3" },
+  { "name": "Paula Beck", "phone": "92 66 283 55 94", "file": "ttsmaker-file-2026-5-11-15-32-42.mp3" },
+  { "name": "Fabian Roth", "phone": "35 205 37 77 48", "file": "ttsmaker-file-2026-5-11-15-34-47.mp3" },
+  { "name": "Marta Sommer", "phone": "61 726 49 88", "file": "ttsmaker-file-2026-5-11-15-36-33.mp3" },
+  { "name": "Theo Haas", "phone": "94 188 37 205 4", "file": "ttsmaker-file-2026-5-11-15-38-2.mp3" },
+  { "name": "Klara Blume", "phone": "70 409 88 51 33", "file": "ttsmaker-file-2026-5-11-15-39-55.mp3" },
+  { "name": "Noah Krane", "phone": "38 207 288 55 49", "file": "ttsmaker-file-2026-5-11-15-41-59.mp3" },
+  { "name": "Ida Lorenz", "phone": "65 306 66 28 99", "file": "ttsmaker-file-2026-5-11-15-43-21.mp3" },
+  { "name": "Emil Stein", "phone": "81 388 55 99 204", "file": "ttsmaker-file-2026-5-11-15-45-27.mp3" },
+  { "name": "Greta Holz", "phone": "76 11 209 88 66 44", "file": "ttsmaker-file-2026-5-11-15-46-54.mp3" },
+  { "name": "Ben Graf", "phone": "92 699 81 44 2", "file": "ttsmaker-file-2026-5-11-15-48-16.mp3" },
+  { "name": "Lisa Klose", "phone": "43 343 203 47 44", "file": "ttsmaker-file-2026-5-11-17-52-32.mp3" },
+  { "name": "Karl Jäger", "phone": "95 77 88 44 36 9", "file": "ttsmaker-file-2026-5-11-18-0-32.mp3" },
+  { "name": "Frida Lange", "phone": "80 255 88 99 43", "file": "ttsmaker-file-2026-5-11-18-3-36.mp3" },
+  { "name": "Sven Winter", "phone": "69 0 55 33 99 208 7", "file": "ttsmaker-file-2026-5-11-18-5-45.mp3" },
+  { "name": "Mila Busch", "phone": "45 888 79 44 6", "file": "ttsmaker-file-2026-5-11-18-15-49.mp3" },
+  { "name": "Luis Seidel", "phone": "71 55 44 208 99 3", "file": "ttsmaker-file-2026-5-11-18-18-37.mp3" },
+  { "name": "Rosa Arndt", "phone": "39 377 99 55 84", "file": "ttsmaker-file-2026-5-11-18-20-0.mp3" },
+  { "name": "Arthur Brandt", "phone": "62 166 88 288 3", "file": "ttsmaker-file-2026-5-11-18-21-48.mp3" },
+  { "name": "Nele Kuhn", "phone": "98 355 99 55 208 6", "file": "ttsmaker-file-2026-5-11-18-24-23.mp3" },
+  { "name": "Hugo Marder", "phone": "55 288 99 91 207", "file": "ttsmaker-file-2026-5-11-18-26-44.mp3" },
+  { "name": "Vera Ost", "phone": "7 5 444 66 88 31 0", "file": "ttsmaker-file-2026-5-11-18-28-58.mp3" },
+  { "name": "Fritz Nagel", "phone": "91 293 99 84 66", "file": "ttsmaker-file-2026-5-11-18-30-21.mp3" },
+  { "name": "Bruno Held", "phone": "38 206 66 99 81 17", "file": "ttsmaker-file-2026-5-11-18-37-29.mp3" },
+  { "name": "Linda Pfeifer", "phone": "97 388 14 88 99 2", "file": "ttsmaker-file-2026-5-11-18-41-16.mp3" },
+  { "name": "Heiko Mann", "phone": "55 33 99 55 44 81 7", "file": "ttsmaker-file-2026-5-11-18-43-29.mp3" },
+  { "name": "Elsa Kroll", "phone": "99 777 55 41 99 0", "file": "ttsmaker-file-2026-5-11-18-46-19.mp3" },
+  { "name": "Leni Schuber", "phone": "80 444 77 33 17 06", "file": "ttsmaker-file-2026-5-11-18-53-35.mp3" },
+  { "name": "Stefan Stark", "phone": "30 66 208 99 88 55 4", "file": "ttsmaker-file-2026-5-11-18-55-34.mp3" }
+    
+];
+
+
+    let currentTrackIndex = 0;
+    let selectedTracks = [];
+    let playbackSpeed = 1.0;
+    const audio = new Audio();
+
+    function updateSpeedLabel(val) {
+        document.getElementById('speed-value').innerHTML = `<strong>${val}x</strong>`;
+        playbackSpeed = parseFloat(val);
+    }
+
+    // Тщательное перемешивание массива (Алгоритм Фишера-Йетса)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    function initNewTest() {
+        const count = parseInt(document.getElementById('file-count').value);
+        
+        // Создаем копию библиотеки, чтобы не портить оригинал
+        let deck = [...fullLibrary];
+        
+        // Перемешиваем и выбираем нужное количество (повторы невозможны)
+        selectedTracks = shuffleArray(deck).slice(0, count);
+        
+        startPlayback();
+    }
+
+    function restartSameTest() {
+        document.getElementById('result-screen').classList.add('hidden');
+        document.getElementById('answers-container').innerHTML = "";
+        startPlayback();
+    }
+
+    function startPlayback() {
+        currentTrackIndex = 0;
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('play-screen').classList.remove('hidden');
+        document.getElementById('current-speed-display').innerText = `Скорость: ${playbackSpeed}x`;
+        playTrack();
+    }
+
+    function playTrack() {
+        if (currentTrackIndex < selectedTracks.length) {
+            document.getElementById('status-text').innerText = `Запись ${currentTrackIndex + 1} из ${selectedTracks.length}`;
+            audio.src = selectedTracks[currentTrackIndex].file;
+            audio.playbackRate = playbackSpeed;
+            
+            audio.play();
+            // Повторная установка для мобильных браузеров
+            audio.onplay = () => { audio.playbackRate = playbackSpeed; };
+
+            audio.onended = () => {
+                currentTrackIndex++;
+                setTimeout(playTrack, 1200 / playbackSpeed);
+            };
+        } else {
+            showResults();
+        }
+    }
+
+    function showResults() {
+        document.getElementById('play-screen').classList.add('hidden');
+        document.getElementById('result-screen').classList.remove('hidden');
+        const container = document.getElementById('answers-container');
+        container.innerHTML = ""; // Очистка перед заполнением
+        
+        selectedTracks.forEach((track, index) => {
+            const div = document.createElement('div');
+            div.className = 'answer-item';
+            div.innerHTML = `<strong>#${index + 1}</strong><br>👤 ${track.name}<br>📞 ${track.phone}`;
+            container.appendChild(div);
+        });
+    }
+</script>
+
+</body>
+</html>
